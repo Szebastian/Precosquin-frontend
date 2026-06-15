@@ -25,7 +25,7 @@ import { RouterLink } from '@angular/router';
       </nav>
 
       <section class="hero">
-        <div class="hero-content" [style.opacity]="scrollY() < 300 ? 1 : Math.max(0, 1 - (scrollY() - 300) / 400)" [style.transform]="'translateY(' + Math.min(scrollY() * 0.15, 60) + 'px)'">
+        <div class="hero-content" [style.opacity]="heroOpacity()" [style.transform]="'translateY(' + heroTranslate() + 'px)'">
           <div class="hero-badge">Festival Folclórico 2026</div>
           <h1 class="hero-title">
             Precosquin<br/>
@@ -930,6 +930,16 @@ import { RouterLink } from '@angular/router';
 export class HomePageComponent {
   currentYear = new Date().getFullYear();
   scrollY = signal(0);
+
+  heroOpacity() {
+    const y = this.scrollY();
+    if (y < 300) return 1;
+    return Math.max(0, 1 - (y - 300) / 400);
+  }
+
+  heroTranslate() {
+    return Math.min(this.scrollY() * 0.15, 60);
+  }
 
   @HostListener('window:scroll')
   onScroll() {
