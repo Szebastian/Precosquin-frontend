@@ -67,6 +67,11 @@ export const appRoutes: Routes = [
         path: 'admin',
         loadChildren: () => import('./features/admin/admin.routes').then(m => m.ADMIN_ROUTES),
         data: { roles: ['admin'] }
+      },
+      {
+        path: 'noticias',
+        loadChildren: () => import('./features/noticias/noticias.routes').then(m => m.NOTICIAS_ROUTES),
+        data: { roles: ['organizador', 'admin', 'staff'] }
       }
     ]
   },
@@ -75,6 +80,18 @@ export const appRoutes: Routes = [
     loadComponent: () => import('./features/public/inscripcion/inscripcion.page').then(m => m.InscripcionPageComponent),
     canActivate: [publicGuard],
     data: { title: 'Inscripción de Artista' }
+  },
+  {
+    path: 'noticias',
+    loadComponent: () => import('./features/public/noticias/noticias-public.page').then(m => m.NoticiasPublicPageComponent),
+    canActivate: [publicGuard],
+    data: { title: 'Noticias' }
+  },
+  {
+    path: 'noticias/:id',
+    loadComponent: () => import('./features/public/noticias/noticia-detail.page').then(m => m.NoticiaDetailPageComponent),
+    canActivate: [publicGuard],
+    data: { title: 'Noticia' }
   },
   {
     path: 'firmar/:token',

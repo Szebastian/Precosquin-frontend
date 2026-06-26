@@ -1,14 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './header/header.component';
 import { SidebarComponent } from './sidebar/sidebar.component';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
   imports: [RouterOutlet, HeaderComponent, SidebarComponent],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.dark]="themeService.isDark()">
       <app-header />
       <div class="app-body">
         <app-sidebar />
@@ -29,7 +30,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
       transition: background 0.3s ease;
     }
 
-    :host-context(.dark) .app-layout {
+    .app-layout.dark {
       background: #0f172a;
     }
 
@@ -49,7 +50,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
       transition: background 0.3s ease;
     }
 
-    :host-context(.dark) .app-content {
+    .app-layout.dark .app-content {
       background: #0f172a;
     }
 
@@ -61,7 +62,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
       background: #e2e8f0;
     }
 
-    :host-context(.dark) .app-content::-webkit-scrollbar-track {
+    .app-layout.dark .app-content::-webkit-scrollbar-track {
       background: #1e293b;
     }
 
@@ -70,7 +71,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
       border-radius: 4px;
     }
 
-    :host-context(.dark) .app-content::-webkit-scrollbar-thumb {
+    .app-layout.dark .app-content::-webkit-scrollbar-thumb {
       background: #475569;
     }
 
@@ -78,7 +79,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
       background: #64748b;
     }
 
-    :host-context(.dark) .app-content::-webkit-scrollbar-thumb:hover {
+    .app-layout.dark .app-content::-webkit-scrollbar-thumb:hover {
       background: #64748b;
     }
 
@@ -93,4 +94,6 @@ import { SidebarComponent } from './sidebar/sidebar.component';
     }
   `]
 })
-export class MainLayoutComponent {}
+export class MainLayoutComponent {
+  themeService = inject(ThemeService);
+}

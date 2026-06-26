@@ -36,9 +36,8 @@ export class ThemeService {
     this._theme.set(theme);
   }
 
-  private _apply(theme: Theme): void {
-    if (isPlatformBrowser(this.platformId)) {
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-    }
+  private _apply(_theme: Theme): void {
+    // Dark mode is applied via .app-layout in main-layout.component, not on <html>
+    // This prevents dark CSS variables from leaking into public pages (home, inscripcion)
   }
 }

@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -51,6 +51,11 @@ interface InscripcionData {
   style: string;
   danceList: string;
   biography: string;
+  dniFrontFile: File | null;
+  dniBackFile: File | null;
+  promoPhotoFile: File | null;
+  lyricsFile: File | null;
+  scoreFile: File | null;
   dniFrontName: string;
   dniBackName: string;
   promoPhotoName: string;
@@ -374,7 +379,7 @@ interface InscripcionData {
                   <label class="form-label">Foto de DNI — Frente</label>
                   <div class="file-upload-area">
                     <label class="file-upload-btn">
-                      <input type="file" #dniFrontInput accept="image/*" hidden (change)="onFileSelect($event, 'dniFrontName')" />
+                      <input type="file" #dniFrontInput accept="image/*" hidden (change)="onFileSelect($event, 'dniFrontFile')" />
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                       </svg>
@@ -388,7 +393,7 @@ interface InscripcionData {
                   <label class="form-label">Foto de DNI — Dorso</label>
                   <div class="file-upload-area">
                     <label class="file-upload-btn">
-                      <input type="file" #dniBackInput accept="image/*" hidden (change)="onFileSelect($event, 'dniBackName')" />
+                      <input type="file" #dniBackInput accept="image/*" hidden (change)="onFileSelect($event, 'dniBackFile')" />
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                       </svg>
@@ -402,7 +407,7 @@ interface InscripcionData {
                   <label class="form-label">Foto promocional del artista o grupo</label>
                   <div class="file-upload-area">
                     <label class="file-upload-btn">
-                      <input type="file" #promoPhotoInput accept="image/*" hidden (change)="onFileSelect($event, 'promoPhotoName')" />
+                      <input type="file" #promoPhotoInput accept="image/*" hidden (change)="onFileSelect($event, 'promoPhotoFile')" />
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                       </svg>
@@ -429,7 +434,7 @@ interface InscripcionData {
                     <label class="form-label">Letra de la canción</label>
                     <div class="file-upload-area">
                       <label class="file-upload-btn">
-                        <input type="file" #lyricsInput accept=".pdf,.doc,.docx,.txt" hidden (change)="onFileSelect($event, 'lyricsFileName')" />
+                        <input type="file" #lyricsInput accept=".pdf,.doc,.docx,.txt" hidden (change)="onFileSelect($event, 'lyricsFile')" />
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
                         </svg>
@@ -443,7 +448,7 @@ interface InscripcionData {
                     <label class="form-label">Partitura</label>
                     <div class="file-upload-area">
                       <label class="file-upload-btn">
-                        <input type="file" #scoreInput accept=".pdf,.png,.jpg,.jpeg" hidden (change)="onFileSelect($event, 'scoreFileName')" />
+                        <input type="file" #scoreInput accept=".pdf,.png,.jpg,.jpeg" hidden (change)="onFileSelect($event, 'scoreFile')" />
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
                         </svg>
@@ -617,15 +622,27 @@ interface InscripcionData {
                   <div class="review-grid">
                     <div class="review-item">
                       <span class="review-label">DNI Frente</span>
-                      <span class="review-value">{{ data.dniFrontName || 'No adjuntado' }}</span>
+                      @if (filePreviews['dniFrontFile']) {
+                        <img [src]="filePreviews['dniFrontFile']" class="review-thumb" alt="DNI Frente" />
+                      } @else {
+                        <span class="review-value">{{ data.dniFrontName || 'No adjuntado' }}</span>
+                      }
                     </div>
                     <div class="review-item">
                       <span class="review-label">DNI Dorso</span>
-                      <span class="review-value">{{ data.dniBackName || 'No adjuntado' }}</span>
+                      @if (filePreviews['dniBackFile']) {
+                        <img [src]="filePreviews['dniBackFile']" class="review-thumb" alt="DNI Dorso" />
+                      } @else {
+                        <span class="review-value">{{ data.dniBackName || 'No adjuntado' }}</span>
+                      }
                     </div>
                     <div class="review-item">
                       <span class="review-label">Foto Promocional</span>
-                      <span class="review-value">{{ data.promoPhotoName || 'No adjuntada' }}</span>
+                      @if (filePreviews['promoPhotoFile']) {
+                        <img [src]="filePreviews['promoPhotoFile']" class="review-thumb" alt="Foto Promocional" />
+                      } @else {
+                        <span class="review-value">{{ data.promoPhotoName || 'No adjuntada' }}</span>
+                      }
                     </div>
                     <div class="review-item full-width">
                       <span class="review-label">Biografía Artística</span>
@@ -638,7 +655,11 @@ interface InscripcionData {
                       </div>
                       <div class="review-item">
                         <span class="review-label">Partitura</span>
-                        <span class="review-value">{{ data.scoreFileName || 'No adjuntada' }}</span>
+                        @if (filePreviews['scoreFile']) {
+                          <img [src]="filePreviews['scoreFile']" class="review-thumb" alt="Partitura" />
+                        } @else {
+                          <span class="review-value">{{ data.scoreFileName || 'No adjuntada' }}</span>
+                        }
                       </div>
                     }
                   </div>
@@ -1480,6 +1501,15 @@ interface InscripcionData {
       white-space: nowrap;
     }
 
+    .review-thumb {
+      width: 120px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      border: 2px solid rgba(99, 102, 241, 0.3);
+      margin-top: var(--space-1);
+    }
+
     .declaration-section {
       display: flex;
       flex-direction: column;
@@ -1857,7 +1887,7 @@ interface InscripcionData {
     }
   `]
 })
-export class InscripcionPageComponent {
+export class InscripcionPageComponent implements OnDestroy {
   private http = inject(HttpClient);
 
   currentStep = signal(1);
@@ -1865,6 +1895,7 @@ export class InscripcionPageComponent {
   submitting = signal(false);
   error = signal('');
   inscriptionResult = signal<InscripcionResult | null>(null);
+  filePreviews: Record<string, string> = {};
 
   steps = [
     { number: 1, label: 'Datos' },
@@ -1903,6 +1934,11 @@ export class InscripcionPageComponent {
     style: '',
     danceList: '',
     biography: '',
+    dniFrontFile: null,
+    dniBackFile: null,
+    promoPhotoFile: null,
+    lyricsFile: null,
+    scoreFile: null,
     dniFrontName: '',
     dniBackName: '',
     promoPhotoName: '',
@@ -1985,8 +2021,28 @@ export class InscripcionPageComponent {
   onFileSelect(event: Event, fieldName: string): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      (this.data as any)[fieldName] = input.files[0].name;
+      const file = input.files[0];
+      (this.data as any)[fieldName] = file;
+      const nameMap: Record<string, string> = {
+        dniFrontFile: 'dniFrontName',
+        dniBackFile: 'dniBackName',
+        promoPhotoFile: 'promoPhotoName',
+        lyricsFile: 'lyricsFileName',
+        scoreFile: 'scoreFileName',
+      };
+      (this.data as any)[nameMap[fieldName]] = file.name;
+
+      if (file.type.startsWith('image/')) {
+        if (this.filePreviews[fieldName]) {
+          URL.revokeObjectURL(this.filePreviews[fieldName]);
+        }
+        this.filePreviews[fieldName] = URL.createObjectURL(file);
+      }
     }
+  }
+
+  ngOnDestroy(): void {
+    Object.values(this.filePreviews).forEach(url => URL.revokeObjectURL(url));
   }
 
   getFilledThemesCount(): number {
@@ -2093,15 +2149,60 @@ export class InscripcionPageComponent {
 
     this.http.post<InscripcionResult>(`${environment.apiUrl}/inscriptions/`, payload).subscribe({
       next: (result) => {
-        this.submitting.set(false);
         this.inscriptionResult.set(result);
-        this.submitted.set(true);
-        this.currentStep.set(7);
+        this.uploadFiles(result.id);
       },
       error: (err) => {
         this.submitting.set(false);
         this.error.set(err.error?.detail || 'Error al enviar la inscripción. Intentá de nuevo.');
       },
     });
+  }
+
+  private uploadFiles(inscriptionId: string): void {
+    const files: { file: File; type: string }[] = [];
+
+    if (this.data.dniFrontFile) files.push({ file: this.data.dniFrontFile, type: 'dni_front' });
+    if (this.data.dniBackFile) files.push({ file: this.data.dniBackFile, type: 'dni_back' });
+    if (this.data.promoPhotoFile) files.push({ file: this.data.promoPhotoFile, type: 'promo_photo' });
+    if (this.data.lyricsFile) files.push({ file: this.data.lyricsFile, type: 'lyrics' });
+    if (this.data.scoreFile) files.push({ file: this.data.scoreFile, type: 'score' });
+
+    if (files.length === 0) {
+      this.submitting.set(false);
+      this.submitted.set(true);
+      this.currentStep.set(7);
+      return;
+    }
+
+    let uploaded = 0;
+    const total = files.length;
+
+    for (const { file, type } of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      this.http.post(
+        `${environment.apiUrl}/inscriptions/upload/${inscriptionId}?file_type=${type}`,
+        formData
+      ).subscribe({
+        next: () => {
+          uploaded++;
+          if (uploaded === total) {
+            this.submitting.set(false);
+            this.submitted.set(true);
+            this.currentStep.set(7);
+          }
+        },
+        error: () => {
+          uploaded++;
+          if (uploaded === total) {
+            this.submitting.set(false);
+            this.submitted.set(true);
+            this.currentStep.set(7);
+          }
+        },
+      });
+    }
   }
 }
