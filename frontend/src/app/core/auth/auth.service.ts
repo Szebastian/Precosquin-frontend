@@ -42,11 +42,43 @@ export class AuthService {
     try {
       const data: any = await this.http.post(`${environment.apiUrl}/auth/login`, { email, password }).toPromise();
       this._session.set(data);
+      await this.loadProfile();
       return { error: null };
     } catch (error: any) {
       return { error: error.message };
     } finally {
       this._loading.set(false);
+    }
+  }
+
+  async loadProfile(): Promise<void> {
+    const session = this._session();
+    if (!session?.access_token) return;
+
+    try {
+      const profile: any = await this.http.get(`${environment.apiUrl}/auth/profile`).toPromise();
+      this._profile.set(profile);
+    } catch {
+      this._decodeProfileFromToken(session.access_token);
+    }
+  }
+
+  private _decodeProfileFromToken(token: string): void {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const metadata = payload.user_metadata || payload.app_metadata || {};
+      this._profile.set({
+        id: payload.sub,
+        email: payload.email || '',
+        full_name: metadata.full_name || '',
+        role: (metadata.role || payload.role || 'staff') as any,
+        organization_id: metadata.organization_id || null,
+        is_active: true,
+        permissions: metadata.permissions || [],
+        last_login_at: '',
+      });
+    } catch {
+      this._profile.set(null);
     }
   }
 

@@ -41,7 +41,7 @@ export const appRoutes: Routes = [
       {
         path: 'jurado',
         loadChildren: () => import('./features/jurado/jurado.routes').then(m => m.JURADO_ROUTES),
-        data: { roles: ['jurado', 'organizador', 'admin'] }
+        data: { roles: ['admin'] }
       },
       {
         path: 'staff',
@@ -92,6 +92,12 @@ export const appRoutes: Routes = [
     loadComponent: () => import('./features/public/noticias/noticia-detail.page').then(m => m.NoticiaDetailPageComponent),
     canActivate: [publicGuard],
     data: { title: 'Noticia' }
+  },
+  {
+    path: 'documentacion',
+    loadComponent: () => import('./features/public/documentacion/documentacion.page').then(m => m.DocumentacionPageComponent),
+    canActivate: [publicGuard],
+    data: { title: 'Documentación' }
   },
   {
     path: 'firmar/:token',

@@ -53,7 +53,7 @@ interface NewsItem {
             <a routerLink="/noticias" class="nav-link">Noticias</a>
             <a routerLink="/inscripcion" class="nav-link">Inscripciones</a>
             <a href="#" class="nav-link">Cronograma</a>
-            <a href="#" class="nav-link">Documentos</a>
+            <a routerLink="/documentacion" class="nav-link">Documentación</a>
           </nav>
           
           <div class="header-right">
@@ -243,6 +243,7 @@ interface NewsItem {
           </div>
           
           <div class="footer-links">
+            <a routerLink="/documentacion">Documentación</a>
             <a href="#">Contacto</a>
             <a href="#">Términos y Condiciones</a>
             <a href="#">Preguntas Frecuentes</a>
