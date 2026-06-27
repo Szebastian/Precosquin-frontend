@@ -80,7 +80,7 @@ async def list_inscriptions(
     category: Optional[str] = None,
     subcategory: Optional[str] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
-    current_user: CurrentUser = Depends(require_role("organizador", "admin", "staff")),
+    current_user: CurrentUser = Depends(require_role("organizador", "admin", "staff", "jurado")),
 ):
     db = get_supabase()
 

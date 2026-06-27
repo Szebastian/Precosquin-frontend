@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from app.db.session import get_supabase
+from app.core.deps import get_current_user, CurrentUser
 
 router = APIRouter()
 
@@ -162,3 +163,40 @@ async def logout():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al cerrar sesión: {str(e)}",
         )
+
+
+class ProfileResponse(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    role: str
+    organization_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    is_active: bool
+    permissions: list[str] = []
+    last_login_at: Optional[str] = None
+
+
+@router.get("/profile", response_model=ProfileResponse)
+async def get_profile(current_user: CurrentUser = Depends(get_current_user)):
+    db = get_supabase()
+    result = db.table("profiles").select("*").eq("id", current_user.id).single().execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil no encontrado",
+        )
+
+    p = result.data
+    return ProfileResponse(
+        id=p["id"],
+        email=p["email"],
+        full_name=p.get("full_name", ""),
+        role=p.get("role", "staff"),
+        organization_id=p.get("organization_id"),
+        avatar_url=p.get("avatar_url"),
+        is_active=p.get("is_active", True),
+        permissions=p.get("permissions", []),
+        last_login_at=p.get("last_login_at"),
+    )
