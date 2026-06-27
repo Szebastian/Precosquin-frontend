@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject, OnDestroy } from '@angular/core';
+import { Component, signal, computed, inject, OnDestroy, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -30,6 +30,31 @@ interface ThemeRow {
   author: string;
 }
 
+interface RiderTecnico {
+  sonido: {
+    microfonos: string[];
+    monitores: string;
+    consola: string;
+    diBoxes: number | null;
+    cables: string[];
+    backline: string[];
+  };
+  iluminacion: string;
+  escenario: {
+    metrosLineales: number | null;
+    fondoEscenario: string;
+    pisos: string[];
+  };
+  backstage: {
+    vestuario: boolean;
+    camarines: number | null;
+    hospedaje: boolean;
+    viaticos: boolean;
+    observaciones: string;
+  };
+  otros: string;
+}
+
 interface InscripcionData {
   fullName: string;
   dni: string;
@@ -46,6 +71,7 @@ interface InscripcionData {
   artisticName: string;
   themes: ThemeRow[];
   technicalNeeds: string;
+  riderTecnico: RiderTecnico;
   proposalName: string;
   choreographerName: string;
   style: string;
@@ -72,17 +98,17 @@ interface InscripcionData {
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="public-page">
-      @if (currentStep() < 7) {
+      @if (currentStep() < 8) {
         <nav class="form-nav">
           <a routerLink="/" class="nav-brand">
             <img src="assets/logo.svg" alt="Precosquin" class="nav-logo" />
             <span>Precosquin</span>
           </a>
-          <a routerLink="/auth/login" class="nav-link">¿Ya tenés cuenta? Acceder</a>
+          <a routerLink="/" class="nav-link">Volver al inicio</a>
         </nav>
       }
 
-      @if (currentStep() < 7) {
+      @if (currentStep() < 8) {
         <div class="form-wrapper">
           <div class="form-card animate-scale-in">
             <div class="form-header">
@@ -91,6 +117,10 @@ interface InscripcionData {
             </div>
 
             <div class="steps-indicator">
+              <div class="progress-bar-wrapper">
+                <div class="progress-bar-fill" [style.width.%]="getProgressPercentage()"></div>
+                <span class="progress-bar-text">{{ getProgressPercentage() }}% completado</span>
+              </div>
               @for (step of visibleSteps(); track step.number; let i = $index) {
                 <div class="step" [class.active]="currentStep() === step.number" [class.completed]="currentStep() > step.number">
                   <div class="step-circle">
@@ -113,7 +143,7 @@ interface InscripcionData {
             <form (submit)="onSubmit($event)" class="inscription-form">
 
             @if (currentStep() === 1) {
-              <div class="step-content animate-fade-in">
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 <h2 class="step-title">Datos Generales del Participante</h2>
                 <p class="step-desc">Completá tus datos personales de contacto</p>
 
@@ -127,12 +157,14 @@ interface InscripcionData {
                   <div class="form-group">
                     <label class="form-label" for="dni">DNI *</label>
                     <input type="text" id="dni" name="dni" required class="form-input"
-                      [(ngModel)]="data.dni" placeholder="12345678" />
+                      [(ngModel)]="data.dni" placeholder="12345678" maxlength="8" />
+                    <span class="form-hint">Solo números, 7 u 8 dígitos</span>
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="birthDate">Fecha de nacimiento *</label>
                     <input type="date" id="birthDate" name="birthDate" required class="form-input"
                       [(ngModel)]="data.birthDate" (ngModelChange)="onBirthDateChange()" />
+                    <span class="form-hint">Debés tener al menos 16 años</span>
                   </div>
                 </div>
 
@@ -157,8 +189,13 @@ interface InscripcionData {
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="province">Provincia *</label>
-                    <input type="text" id="province" name="province" required class="form-input"
-                      [(ngModel)]="data.province" placeholder="Ej: Chubut" />
+                    <select id="province" name="province" required class="form-input"
+                      [(ngModel)]="data.province">
+                      <option value="">Seleccionar provincia</option>
+                      @for (prov of provincias; track prov) {
+                        <option [value]="prov">{{ prov }}</option>
+                      }
+                    </select>
                   </div>
                 </div>
 
@@ -167,18 +204,20 @@ interface InscripcionData {
                     <label class="form-label" for="phone">Teléfono de contacto *</label>
                     <input type="tel" id="phone" name="phone" required class="form-input"
                       [(ngModel)]="data.phone" placeholder="+54 11 1234-5678" />
+                    <span class="form-hint">Con código de país y área</span>
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="email">Correo electrónico *</label>
                     <input type="email" id="email" name="email" required class="form-input"
                       [(ngModel)]="data.email" placeholder="tu&#64;ejemplo.com" />
+                    <span class="form-hint">Recibirás confirmación en este email</span>
                   </div>
                 </div>
               </div>
             }
 
             @if (currentStep() === 2) {
-              <div class="step-content animate-fade-in">
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 <h2 class="step-title">Rubro de Participación</h2>
                 <p class="step-desc">Seleccioná la categoría y subcategoría de tu presentación</p>
 
@@ -229,7 +268,7 @@ interface InscripcionData {
             }
 
             @if (currentStep() === 3) {
-              <div class="step-content animate-fade-in">
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 <h2 class="step-title">Integrantes del Grupo</h2>
                 <p class="step-desc">Agregá los datos de cada integrante</p>
 
@@ -292,10 +331,16 @@ interface InscripcionData {
             }
 
             @if (currentStep() === 4) {
-              <div class="step-content animate-fade-in">
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 @if (data.category === 'musica') {
                   <h2 class="step-title">Información Artística — Música</h2>
                   <p class="step-desc">Completá los datos de tu presentación musical</p>
+
+                  @if (data.subcategory === 'cancion_inedita') {
+                    <div class="alert-info" style="margin-bottom: var(--space-4);">
+                      <strong>Atención:</strong> Para Canción Inédita deberás cargar la letra y la partitura en el paso 6 (Archivos).
+                    </div>
+                  }
 
                   <div class="form-group">
                     <label class="form-label" for="artisticName">Nombre artístico</label>
@@ -371,49 +416,232 @@ interface InscripcionData {
             }
 
             @if (currentStep() === 5) {
-              <div class="step-content animate-fade-in">
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
+                <div class="step-title-row">
+                  <h2 class="step-title">Rider Técnico</h2>
+                  <span class="optional-badge">Opcional</span>
+                </div>
+                <p class="step-desc">Indicá qué necesitás para tu presentación en escenario. Podés avanzar sin completar esta sección.</p>
+
+                <!-- SONIDO -->
+                <div class="rider-section">
+                  <div class="rider-section-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                    <h3>Sonido</h3>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Microfonos necesarios</label>
+                    <div class="rider-chips">
+                      @for (mic of micOptions; track mic) {
+                        <label class="rider-chip" [class.selected]="data.riderTecnico.sonido.microfonos.includes(mic)">
+                          <input type="checkbox" [checked]="data.riderTecnico.sonido.microfonos.includes(mic)" (change)="toggleMic(mic)" />
+                          {{ mic }}
+                        </label>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Monitores de escenario</label>
+                      <select class="form-input" [(ngModel)]="data.riderTecnico.sonido.monitores" name="monitores">
+                        <option value="">No requiere</option>
+                        <option value="1">1 monitor</option>
+                        <option value="2">2 monitores</option>
+                        <option value="3">3 monitores</option>
+                        <option value="4">4 monitores</option>
+                        <option value="custom">Más de 4 (especificar en observaciones)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">DI Boxes</label>
+                      <input type="number" class="form-input" [(ngModel)]="data.riderTecnico.sonido.diBoxes" name="diBoxes" placeholder="Cantidad" min="0" max="20" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Backline (equipamiento que lleva el artista)</label>
+                    <div class="rider-chips">
+                      @for (item of backlineOptions; track item) {
+                        <label class="rider-chip" [class.selected]="data.riderTecnico.sonido.backline.includes(item)">
+                          <input type="checkbox" [checked]="data.riderTecnico.sonido.backline.includes(item)" (change)="toggleBackline(item)" />
+                          {{ item }}
+                        </label>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="cables">Cables o conectores especiales</label>
+                    <input type="text" id="cables" class="form-input" [(ngModel)]="cablesInput" name="cables"
+                      placeholder="Ej: cable XLR 10m, jack 1/4, adaptador mini-jack" />
+                    <span class="form-hint">Separá múltiples ítems con coma</span>
+                  </div>
+                </div>
+
+                <!-- ILUMINACIÓN -->
+                <div class="rider-section">
+                  <div class="rider-section-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    <h3>Iluminación</h3>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="iluminacion">Necesidades de iluminación</label>
+                    <textarea id="iluminacion" class="form-textarea" rows="3"
+                      [(ngModel)]="data.riderTecnico.iluminacion" name="iluminacion"
+                      placeholder="Describí necesidades especiales de iluminación (colores, efectos, velo, etc.)"></textarea>
+                    <span class="form-hint">Si no tenés necesidades especiales, dejalo vacío</span>
+                  </div>
+                </div>
+
+                <!-- ESCENARIO -->
+                <div class="rider-section">
+                  <div class="rider-section-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                    <h3>Escenario</h3>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Metros lineales de escenario</label>
+                      <input type="number" class="form-input" [(ngModel)]="data.riderTecnico.escenario.metrosLineales" name="metrosLineales" placeholder="Ej: 8" min="1" max="30" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Fondo de escenario</label>
+                      <select class="form-input" [(ngModel)]="data.riderTecnico.escenario.fondoEscenario" name="fondoEscenario">
+                        <option value="">Sin preferencia</option>
+                        <option value="negro">Negro</option>
+                        <option value="blanco">Blanco</option>
+                        <option value="azul">Azul</option>
+                        <option value="proyeccion">Con proyección</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Tipo de piso</label>
+                    <div class="rider-chips">
+                      @for (piso of pisoOptions; track piso) {
+                        <label class="rider-chip" [class.selected]="data.riderTecnico.escenario.pisos.includes(piso)">
+                          <input type="checkbox" [checked]="data.riderTecnico.escenario.pisos.includes(piso)" (change)="togglePiso(piso)" />
+                          {{ piso }}
+                        </label>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BACKSTAGE -->
+                <div class="rider-section">
+                  <div class="rider-section-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <h3>Backstage y Logística</h3>
+                  </div>
+
+                  <div class="rider-checks">
+                    <label class="checkbox-label">
+                      <input type="checkbox" [(ngModel)]="data.riderTecnico.backstage.vestuario" name="vestuario" />
+                      <span>Requiere vestuario / camerino</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" [(ngModel)]="data.riderTecnico.backstage.hospedaje" name="hospedaje" />
+                      <span>Requiere hospedaje</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" [(ngModel)]="data.riderTecnico.backstage.viaticos" name="viaticos" />
+                      <span>Requiere viáticos</span>
+                    </label>
+                  </div>
+
+                  <div class="form-group" style="margin-top: var(--space-4);">
+                    <label class="form-label" for="backstageObs">Observaciones del backstage</label>
+                    <textarea id="backstageObs" class="form-textarea" rows="3"
+                      [(ngModel)]="data.riderTecnico.backstage.observaciones" name="backstageObs"
+                      placeholder="Cualquier necesidad adicional: cantidad de camarines, accesibilidad, alimentación, etc."></textarea>
+                  </div>
+                </div>
+
+                <!-- OTROS -->
+                <div class="rider-section">
+                  <div class="rider-section-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <h3>Otras Necesidades</h3>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="otrosRider">Información adicional</label>
+                    <textarea id="otrosRider" class="form-textarea" rows="3"
+                      [(ngModel)]="data.riderTecnico.otros" name="otrosRider"
+                      placeholder="Cualquier otra necesidad técnica no contemplada en las secciones anteriores..."></textarea>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (currentStep() === 6) {
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 <h2 class="step-title">Archivos a Adjuntar</h2>
                 <p class="step-desc">Subí los archivos requeridos para completar tu inscripción</p>
 
                 <div class="form-group">
                   <label class="form-label">Foto de DNI — Frente</label>
                   <div class="file-upload-area">
-                    <label class="file-upload-btn">
-                      <input type="file" #dniFrontInput accept="image/*" hidden (change)="onFileSelect($event, 'dniFrontFile')" />
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      Seleccionar archivo
-                    </label>
-                    <span class="file-name-display">{{ data.dniFrontName || 'Ningún archivo seleccionado' }}</span>
+                    <div class="file-drop-zone" [class.drag-over]="dragOverStates['dniFrontFile']" [class.has-file]="data.dniFrontName"
+                      (dragover)="onDragOver($event, 'dniFrontFile')" (dragleave)="onDragLeave($event, 'dniFrontFile')" (drop)="onDrop($event, 'dniFrontFile')">
+                      <label class="file-upload-btn">
+                        <input type="file" #dniFrontInput accept="image/*" hidden (change)="onFileSelect($event, 'dniFrontFile')" />
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Seleccionar archivo
+                      </label>
+                      <span class="file-name-display">{{ data.dniFrontName || 'Arrastrá un archivo o hacé click' }}</span>
+                      @if (dragOverStates['dniFrontFile']) {
+                        <span class="drag-over-text">Soltá el archivo aquí</span>
+                      }
+                    </div>
                   </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">Foto de DNI — Dorso</label>
                   <div class="file-upload-area">
-                    <label class="file-upload-btn">
-                      <input type="file" #dniBackInput accept="image/*" hidden (change)="onFileSelect($event, 'dniBackFile')" />
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      Seleccionar archivo
-                    </label>
-                    <span class="file-name-display">{{ data.dniBackName || 'Ningún archivo seleccionado' }}</span>
+                    <div class="file-drop-zone" [class.drag-over]="dragOverStates['dniBackFile']" [class.has-file]="data.dniBackName"
+                      (dragover)="onDragOver($event, 'dniBackFile')" (dragleave)="onDragLeave($event, 'dniBackFile')" (drop)="onDrop($event, 'dniBackFile')">
+                      <label class="file-upload-btn">
+                        <input type="file" #dniBackInput accept="image/*" hidden (change)="onFileSelect($event, 'dniBackFile')" />
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Seleccionar archivo
+                      </label>
+                      <span class="file-name-display">{{ data.dniBackName || 'Arrastrá un archivo o hacé click' }}</span>
+                      @if (dragOverStates['dniBackFile']) {
+                        <span class="drag-over-text">Soltá el archivo aquí</span>
+                      }
+                    </div>
                   </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">Foto promocional del artista o grupo</label>
                   <div class="file-upload-area">
-                    <label class="file-upload-btn">
-                      <input type="file" #promoPhotoInput accept="image/*" hidden (change)="onFileSelect($event, 'promoPhotoFile')" />
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      Seleccionar archivo
-                    </label>
-                    <span class="file-name-display">{{ data.promoPhotoName || 'Ningún archivo seleccionado' }}</span>
+                    <div class="file-drop-zone" [class.drag-over]="dragOverStates['promoPhotoFile']" [class.has-file]="data.promoPhotoName"
+                      (dragover)="onDragOver($event, 'promoPhotoFile')" (dragleave)="onDragLeave($event, 'promoPhotoFile')" (drop)="onDrop($event, 'promoPhotoFile')">
+                      <label class="file-upload-btn">
+                        <input type="file" #promoPhotoInput accept="image/*" hidden (change)="onFileSelect($event, 'promoPhotoFile')" />
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Seleccionar archivo
+                      </label>
+                      <span class="file-name-display">{{ data.promoPhotoName || 'Arrastrá un archivo o hacé click' }}</span>
+                      @if (dragOverStates['promoPhotoFile']) {
+                        <span class="drag-over-text">Soltá el archivo aquí</span>
+                      }
+                    </div>
                   </div>
                 </div>
 
@@ -433,36 +661,48 @@ interface InscripcionData {
                   <div class="form-group">
                     <label class="form-label">Letra de la canción</label>
                     <div class="file-upload-area">
-                      <label class="file-upload-btn">
-                        <input type="file" #lyricsInput accept=".pdf,.doc,.docx,.txt" hidden (change)="onFileSelect($event, 'lyricsFile')" />
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        Seleccionar archivo
-                      </label>
-                      <span class="file-name-display">{{ data.lyricsFileName || 'Ningún archivo seleccionado' }}</span>
+                      <div class="file-drop-zone" [class.drag-over]="dragOverStates['lyricsFile']" [class.has-file]="data.lyricsFileName"
+                        (dragover)="onDragOver($event, 'lyricsFile')" (dragleave)="onDragLeave($event, 'lyricsFile')" (drop)="onDrop($event, 'lyricsFile')">
+                        <label class="file-upload-btn">
+                          <input type="file" #lyricsInput accept=".pdf,.doc,.docx,.txt" hidden (change)="onFileSelect($event, 'lyricsFile')" />
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                          Seleccionar archivo
+                        </label>
+                        <span class="file-name-display">{{ data.lyricsFileName || 'Arrastrá un archivo o hacé click' }}</span>
+                        @if (dragOverStates['lyricsFile']) {
+                          <span class="drag-over-text">Soltá el archivo aquí</span>
+                        }
+                      </div>
                     </div>
                   </div>
 
                   <div class="form-group">
                     <label class="form-label">Partitura</label>
                     <div class="file-upload-area">
-                      <label class="file-upload-btn">
-                        <input type="file" #scoreInput accept=".pdf,.png,.jpg,.jpeg" hidden (change)="onFileSelect($event, 'scoreFile')" />
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        Seleccionar archivo
-                      </label>
-                      <span class="file-name-display">{{ data.scoreFileName || 'Ningún archivo seleccionado' }}</span>
+                      <div class="file-drop-zone" [class.drag-over]="dragOverStates['scoreFile']" [class.has-file]="data.scoreFileName"
+                        (dragover)="onDragOver($event, 'scoreFile')" (dragleave)="onDragLeave($event, 'scoreFile')" (drop)="onDrop($event, 'scoreFile')">
+                        <label class="file-upload-btn">
+                          <input type="file" #scoreInput accept=".pdf,.png,.jpg,.jpeg" hidden (change)="onFileSelect($event, 'scoreFile')" />
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                          Seleccionar archivo
+                        </label>
+                        <span class="file-name-display">{{ data.scoreFileName || 'Arrastrá un archivo o hacé click' }}</span>
+                        @if (dragOverStates['scoreFile']) {
+                          <span class="drag-over-text">Soltá el archivo aquí</span>
+                        }
+                      </div>
                     </div>
                   </div>
                 }
               </div>
             }
 
-            @if (currentStep() === 6) {
-              <div class="step-content animate-fade-in">
+            @if (currentStep() === 7) {
+              <div [class]="lastDirection() === 'left' ? 'step-content slide-left' : 'step-content slide-right'">
                 <h2 class="step-title">Declaración Jurada y Revisión</h2>
                 <p class="step-desc">Verificá tu información y aceptá las condiciones</p>
 
@@ -616,8 +856,74 @@ interface InscripcionData {
 
                 <div class="review-section">
                   <div class="review-header">
-                    <h3>Archivos Adjuntos</h3>
+                    <h3>Rider Técnico</h3>
                     <button type="button" class="btn-edit" (click)="goToStep(5)">Editar</button>
+                  </div>
+                  <div class="review-grid">
+                    @if (data.riderTecnico.sonido.microfonos.length > 0) {
+                      <div class="review-item full-width">
+                        <span class="review-label">Microfonos</span>
+                        <span class="review-value">{{ data.riderTecnico.sonido.microfonos.join(', ') }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.sonido.monitores) {
+                      <div class="review-item">
+                        <span class="review-label">Monitores</span>
+                        <span class="review-value">{{ data.riderTecnico.sonido.monitores }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.sonido.diBoxes) {
+                      <div class="review-item">
+                        <span class="review-label">DI Boxes</span>
+                        <span class="review-value">{{ data.riderTecnico.sonido.diBoxes }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.sonido.backline.length > 0) {
+                      <div class="review-item full-width">
+                        <span class="review-label">Backline</span>
+                        <span class="review-value">{{ data.riderTecnico.sonido.backline.join(', ') }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.iluminacion) {
+                      <div class="review-item full-width">
+                        <span class="review-label">Iluminación</span>
+                        <span class="review-value">{{ data.riderTecnico.iluminacion }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.escenario.metrosLineales) {
+                      <div class="review-item">
+                        <span class="review-label">Metros Lineales</span>
+                        <span class="review-value">{{ data.riderTecnico.escenario.metrosLineales }}m</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.escenario.fondoEscenario) {
+                      <div class="review-item">
+                        <span class="review-label">Fondo Escenario</span>
+                        <span class="review-value">{{ data.riderTecnico.escenario.fondoEscenario }}</span>
+                      </div>
+                    }
+                    @if (data.riderTecnico.backstage.vestuario || data.riderTecnico.backstage.hospedaje || data.riderTecnico.backstage.viaticos) {
+                      <div class="review-item full-width">
+                        <span class="review-label">Backstage</span>
+                        <span class="review-value">
+                          @if (data.riderTecnico.backstage.vestuario) { Vestuario }
+                          @if (data.riderTecnico.backstage.hospedaje) { · Hospedaje }
+                          @if (data.riderTecnico.backstage.viaticos) { · Viáticos }
+                        </span>
+                      </div>
+                    }
+                    @if (!hasRiderData()) {
+                      <div class="review-item full-width">
+                        <span class="review-value review-empty">Sin rider técnico configurado</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <div class="review-section">
+                  <div class="review-header">
+                    <h3>Archivos Adjuntos</h3>
+                    <button type="button" class="btn-edit" (click)="goToStep(6)">Editar</button>
                   </div>
                   <div class="review-grid">
                     <div class="review-item">
@@ -693,7 +999,7 @@ interface InscripcionData {
                 @if (error()) {
                   <span class="form-error">{{ error() }}</span>
                 }
-                @if (currentStep() < 6) {
+                @if (currentStep() < 7) {
                   <button type="button" class="btn btn-primary" (click)="nextStep()" [disabled]="!canProceed()">
                     Siguiente
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -701,13 +1007,23 @@ interface InscripcionData {
                     </svg>
                   </button>
                 } @else {
-                  <button type="submit" class="btn btn-primary btn-lg" [disabled]="!canProceed() || submitting()">
-                    @if (submitting()) {
-                      <span class="spinner"></span> Enviando...
-                    } @else {
+                  @if (!showConfirmSubmit()) {
+                    <button type="button" class="btn btn-primary btn-lg" (click)="showConfirmSubmit.set(true)" [disabled]="!canProceed() || submitting()">
                       Enviar Inscripción
-                    }
-                  </button>
+                    </button>
+                  } @else {
+                    <div class="confirm-submit-group">
+                      <span class="confirm-text">¿Confirmás el envío?</span>
+                      <button type="button" class="btn btn-secondary btn-sm" (click)="showConfirmSubmit.set(false)">Cancelar</button>
+                      <button type="submit" class="btn btn-primary btn-lg" [disabled]="submitting()">
+                        @if (submitting()) {
+                          <span class="spinner"></span> {{ submittingText() }}
+                        } @else {
+                          Sí, enviar
+                        }
+                      </button>
+                    </div>
+                  }
                 }
               </div>
             }
@@ -742,7 +1058,7 @@ interface InscripcionData {
       </div>
       }
 
-      @if (currentStep() === 7 && inscriptionResult()) {
+      @if (currentStep() === 8 && inscriptionResult()) {
         <div class="constancia-page animate-scale-in" id="constancia">
           <div class="constancia-card">
             <div class="constancia-header">
@@ -904,6 +1220,37 @@ interface InscripcionData {
                 </div>
               }
 
+              @if (hasRiderData()) {
+                <div class="constancia-divider"></div>
+                <div class="constancia-field">
+                  <span class="constancia-label">Rider Técnico</span>
+                  @if (data.riderTecnico.sonido.microfonos.length > 0) {
+                    <span class="constancia-value">Microfonos: {{ data.riderTecnico.sonido.microfonos.join(', ') }}</span>
+                  }
+                  @if (data.riderTecnico.sonido.monitores) {
+                    <span class="constancia-value">Monitores: {{ data.riderTecnico.sonido.monitores }}</span>
+                  }
+                  @if (data.riderTecnico.sonido.diBoxes) {
+                    <span class="constancia-value">DI Boxes: {{ data.riderTecnico.sonido.diBoxes }}</span>
+                  }
+                  @if (data.riderTecnico.sonido.backline.length > 0) {
+                    <span class="constancia-value">Backline: {{ data.riderTecnico.sonido.backline.join(', ') }}</span>
+                  }
+                  @if (data.riderTecnico.iluminacion) {
+                    <span class="constancia-value">Iluminación: {{ data.riderTecnico.iluminacion }}</span>
+                  }
+                  @if (data.riderTecnico.escenario.metrosLineales) {
+                    <span class="constancia-value">Escenario: {{ data.riderTecnico.escenario.metrosLineales }}m</span>
+                  }
+                  @if (data.riderTecnico.backstage.vestuario || data.riderTecnico.backstage.hospedaje || data.riderTecnico.backstage.viaticos) {
+                    <span class="constancia-value">Backstage: @if (data.riderTecnico.backstage.vestuario) { Vestuario } @if (data.riderTecnico.backstage.hospedaje) { · Hospedaje } @if (data.riderTecnico.backstage.viaticos) { · Viáticos }</span>
+                  }
+                  @if (data.riderTecnico.otros) {
+                    <span class="constancia-value">Otros: {{ data.riderTecnico.otros }}</span>
+                  }
+                </div>
+              }
+
               <div class="constancia-divider"></div>
 
               <div class="constancia-field">
@@ -926,6 +1273,10 @@ interface InscripcionData {
                   <rect x="6" y="14" width="12" height="8"/>
                 </svg>
                 Descargar / Imprimir
+              </button>
+              <button type="button" class="btn btn-secondary" (click)="resetForm()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Nueva inscripción
               </button>
               <a routerLink="/" class="btn btn-secondary">Volver al Inicio</a>
             </div>
@@ -1100,9 +1451,40 @@ interface InscripcionData {
 
     .steps-indicator {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: var(--space-3) var(--space-8) var(--space-6);
+      gap: var(--space-3);
+    }
+
+    .progress-bar-wrapper {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-full);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--brand-600), var(--brand-400));
+      border-radius: var(--radius-full);
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar-text {
+      position: absolute;
+      right: 0;
+      top: -18px;
+      font-size: 10px;
+      color: #64748b;
+      font-weight: var(--weight-medium);
+    }
+
+    .step-progress-row {
+      display: flex;
+      align-items: center;
       gap: 0;
     }
 
@@ -1885,9 +2267,216 @@ interface InscripcionData {
         justify-content: center;
       }
     }
+
+    .rider-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5);
+      margin-bottom: var(--space-5);
+    }
+
+    .rider-section-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      color: var(--brand-400);
+    }
+
+    .rider-section-header h3 {
+      margin: 0;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-semibold);
+      color: #e2e8f0;
+    }
+
+    .rider-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .rider-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px var(--space-3);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .rider-chip input { display: none; }
+
+    .rider-chip:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .rider-chip.selected {
+      border-color: var(--brand-400);
+      background: rgba(99, 102, 241, 0.2);
+      color: var(--brand-300);
+      font-weight: var(--weight-medium);
+    }
+
+    .rider-checks {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .step-title-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-1);
+    }
+
+    .optional-badge {
+      font-size: 10px;
+      font-weight: var(--weight-bold);
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 2px 10px;
+      border-radius: var(--radius-full);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .alert-info {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: var(--radius-lg);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: #c7d2fe;
+      line-height: 1.6;
+    }
+
+    .alert-info strong {
+      color: var(--brand-400);
+    }
+
+    .confirm-submit-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .confirm-text {
+      font-size: var(--text-sm);
+      color: var(--warning-400);
+      font-weight: var(--weight-semibold);
+    }
+
+    .btn-sm {
+      padding: 0.5rem 1rem;
+      font-size: var(--text-xs);
+    }
+
+    .field-error {
+      font-size: var(--text-xs);
+      color: var(--danger-500);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .form-input.error,
+    .form-textarea.error,
+    select.form-input.error {
+      border-color: var(--danger-500);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    }
+
+    .file-upload-area {
+      position: relative;
+    }
+
+    .file-drop-zone {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .file-drop-zone:hover,
+    .file-drop-zone.drag-over {
+      border-color: var(--brand-400);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .file-drop-zone.has-file {
+      border-color: var(--success-400);
+      border-style: solid;
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .drag-over-text {
+      font-size: var(--text-xs);
+      color: var(--brand-400);
+      font-weight: var(--weight-medium);
+    }
+
+    .file-size-error {
+      font-size: var(--text-xs);
+      color: var(--danger-500);
+      margin-top: 4px;
+    }
+
+    .slide-left {
+      animation: slideLeft 0.3s ease-out;
+    }
+
+    .slide-right {
+      animation: slideRight 0.3s ease-out;
+    }
+
+    @keyframes slideLeft {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes slideRight {
+      from { opacity: 0; transform: translateX(-30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @media (max-width: 640px) {
+      .constancia-row {
+        grid-template-columns: 1fr;
+      }
+
+      .subcategory-grid {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: var(--space-2);
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .subcategory-chip {
+        flex-shrink: 0;
+      }
+
+      .confirm-submit-group {
+        flex-wrap: wrap;
+      }
+    }
   `]
 })
-export class InscripcionPageComponent implements OnDestroy {
+export class InscripcionPageComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
 
   currentStep = signal(1);
@@ -1896,14 +2485,28 @@ export class InscripcionPageComponent implements OnDestroy {
   error = signal('');
   inscriptionResult = signal<InscripcionResult | null>(null);
   filePreviews: Record<string, string> = {};
+  showConfirmSubmit = signal(false);
+  submittingText = signal('Enviando inscripción...');
+  lastDirection = signal<'left' | 'right'>('left');
+
+  private draftKey = 'precosquin_inscripcion_draft';
+
+  provincias = [
+    'Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut',
+    'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy',
+    'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén',
+    'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz',
+    'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'
+  ];
 
   steps = [
     { number: 1, label: 'Datos' },
     { number: 2, label: 'Rubro' },
     { number: 3, label: 'Integrantes' },
     { number: 4, label: 'Arte' },
-    { number: 5, label: 'Archivos' },
-    { number: 6, label: 'Confirmar' },
+    { number: 5, label: 'Rider' },
+    { number: 6, label: 'Archivos' },
+    { number: 7, label: 'Confirmar' },
   ];
 
   data: InscripcionData = {
@@ -1929,6 +2532,30 @@ export class InscripcionPageComponent implements OnDestroy {
       { title: '', rhythm: '', author: '' },
     ],
     technicalNeeds: '',
+    riderTecnico: {
+      sonido: {
+        microfonos: [],
+        monitores: '',
+        consola: '',
+        diBoxes: null,
+        cables: [],
+        backline: [],
+      },
+      iluminacion: '',
+      escenario: {
+        metrosLineales: null,
+        fondoEscenario: '',
+        pisos: [],
+      },
+      backstage: {
+        vestuario: false,
+        camarines: null,
+        hospedaje: false,
+        viaticos: false,
+        observaciones: '',
+      },
+      otros: '',
+    },
     proposalName: '',
     choreographerName: '',
     style: '',
@@ -1972,6 +2599,207 @@ export class InscripcionPageComponent implements OnDestroy {
     'duo_vocal', 'conjunto_vocal', 'conjunto_instrumental',
     'conjunto_malambo', 'pareja_tradicional', 'pareja_estilizada', 'conjunto_baile',
   ];
+
+  micOptions = ['Dinámico (SM58)', 'Condensador de solista', 'Inalámbrico', 'Overhead', 'Para acordeón/guitarra', 'Para percusión'];
+  backlineOptions = ['Guitarra eléctrica', 'Guitarra acústica', 'Bajo', 'Batería', 'Acordeón', 'Teclado', 'Percusión menor'];
+  pisoOptions = ['Madera', 'Marley', 'Cemento', 'Hierba / tierra', 'Sin preferencia'];
+
+  cablesInput = '';
+
+  ngOnInit(): void {
+    this.loadDraft();
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(e: BeforeUnloadEvent): void {
+    if (this.currentStep() > 1 && !this.submitted()) {
+      this.saveDraft();
+      e.returnValue = '';
+    }
+  }
+
+  saveDraft(): void {
+    try {
+      const draft = { ...this.data, _step: this.currentStep(), _timestamp: Date.now() };
+      delete (draft as any).dniFrontFile;
+      delete (draft as any).dniBackFile;
+      delete (draft as any).promoPhotoFile;
+      delete (draft as any).lyricsFile;
+      delete (draft as any).scoreFile;
+      localStorage.setItem(this.draftKey, JSON.stringify(draft));
+    } catch {}
+  }
+
+  loadDraft(): void {
+    try {
+      const raw = localStorage.getItem(this.draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft || !draft._timestamp) return;
+      const daysSince = (Date.now() - draft._timestamp) / (1000 * 60 * 60 * 24);
+      if (daysSince > 7) {
+        localStorage.removeItem(this.draftKey);
+        return;
+      }
+      Object.keys(this.data).forEach(key => {
+        if (draft[key] !== undefined && !(this.data as any)[key]?.constructor?.name?.includes('File')) {
+          (this.data as any)[key] = draft[key];
+        }
+      });
+      if (draft._step) this.currentStep.set(draft._step);
+    } catch {}
+  }
+
+  clearDraft(): void {
+    localStorage.removeItem(this.draftKey);
+  }
+
+  getProgressPercentage(): number {
+    const total = 7;
+    const current = this.currentStep();
+    return Math.round(((current - 1) / (total - 1)) * 100);
+  }
+
+  resetForm(): void {
+    this.clearDraft();
+    this.data = {
+      fullName: '', dni: '', birthDate: '', age: null, address: '',
+      locality: '', province: '', phone: '', email: '',
+      category: '', subcategory: '', members: [],
+      artisticName: '', themes: [
+        { title: '', rhythm: '', author: '' },
+        { title: '', rhythm: '', author: '' },
+        { title: '', rhythm: '', author: '' },
+        { title: '', rhythm: '', author: '' },
+        { title: '', rhythm: '', author: '' },
+        { title: '', rhythm: '', author: '' },
+      ],
+      technicalNeeds: '',
+      riderTecnico: {
+        sonido: { microfonos: [], monitores: '', consola: '', diBoxes: null, cables: [], backline: [] },
+        iluminacion: '',
+        escenario: { metrosLineales: null, fondoEscenario: '', pisos: [] },
+        backstage: { vestuario: false, camarines: null, hospedaje: false, viaticos: false, observaciones: '' },
+        otros: '',
+      },
+      proposalName: '', choreographerName: '', style: '', danceList: '', biography: '',
+      dniFrontFile: null, dniBackFile: null, promoPhotoFile: null, lyricsFile: null, scoreFile: null,
+      dniFrontName: '', dniBackName: '', promoPhotoName: '', lyricsFileName: '', scoreFileName: '',
+      acceptRegulations: false, acceptImageRights: false, acceptDataTruth: false,
+    };
+    this.currentStep.set(1);
+    this.submitted.set(false);
+    this.submitting.set(false);
+    this.inscriptionResult.set(null);
+    this.showConfirmSubmit.set(false);
+    this.filePreviews = {};
+  }
+
+  private validateDni(dni: string): boolean {
+    return /^\d{7,8}$/.test(dni);
+  }
+
+  private validateEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  toggleMic(mic: string): void {
+    const idx = this.data.riderTecnico.sonido.microfonos.indexOf(mic);
+    if (idx >= 0) {
+      this.data.riderTecnico.sonido.microfonos.splice(idx, 1);
+    } else {
+      this.data.riderTecnico.sonido.microfonos.push(mic);
+    }
+  }
+
+  toggleBackline(item: string): void {
+    const idx = this.data.riderTecnico.sonido.backline.indexOf(item);
+    if (idx >= 0) {
+      this.data.riderTecnico.sonido.backline.splice(idx, 1);
+    } else {
+      this.data.riderTecnico.sonido.backline.push(item);
+    }
+  }
+
+  togglePiso(piso: string): void {
+    const idx = this.data.riderTecnico.escenario.pisos.indexOf(piso);
+    if (idx >= 0) {
+      this.data.riderTecnico.escenario.pisos.splice(idx, 1);
+    } else {
+      this.data.riderTecnico.escenario.pisos.push(piso);
+    }
+  }
+
+  hasRiderData(): boolean {
+    const r = this.data.riderTecnico;
+    return !!(
+      r.sonido.microfonos.length > 0 ||
+      r.sonido.monitores ||
+      r.sonido.diBoxes ||
+      r.sonido.backline.length > 0 ||
+      r.iluminacion ||
+      r.escenario.metrosLineales ||
+      r.escenario.fondoEscenario ||
+      r.backstage.vestuario ||
+      r.backstage.hospedaje ||
+      r.backstage.viaticos ||
+      r.otros
+    );
+  }
+
+  dragOverStates: Record<string, boolean> = {};
+
+  onDragOver(event: DragEvent, fieldName: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragOverStates[fieldName] = true;
+  }
+
+  onDragLeave(event: DragEvent, fieldName: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragOverStates[fieldName] = false;
+  }
+
+  onDrop(event: DragEvent, fieldName: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragOverStates[fieldName] = false;
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.processFile(files[0], fieldName);
+    }
+  }
+
+  private processFile(file: File, fieldName: string): void {
+    const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const docTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const isImage = imageTypes.includes(file.type);
+    const isDoc = docTypes.includes(file.type);
+    const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+
+    if (!isImage && !isDoc) {
+      this.error.set('Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, PNG, WebP) o documentos (PDF, DOC, TXT).');
+      return;
+    }
+    if (file.size > maxSize) {
+      this.error.set(`El archivo excede el tamaño máximo de ${isImage ? '5MB' : '10MB'}.`);
+      return;
+    }
+
+    this.error.set('');
+    (this.data as any)[fieldName] = file;
+    const nameMap: Record<string, string> = {
+      dniFrontFile: 'dniFrontName', dniBackFile: 'dniBackName',
+      promoPhotoFile: 'promoPhotoName', lyricsFile: 'lyricsFileName', scoreFile: 'scoreFileName',
+    };
+    (this.data as any)[nameMap[fieldName]] = file.name;
+
+    if (file.type.startsWith('image/')) {
+      if (this.filePreviews[fieldName]) URL.revokeObjectURL(this.filePreviews[fieldName]);
+      this.filePreviews[fieldName] = URL.createObjectURL(file);
+    }
+  }
 
   subcategories = computed(() => this.subcategoriesByCategory[this.data.category] || []);
 
@@ -2052,9 +2880,17 @@ export class InscripcionPageComponent implements OnDestroy {
   canProceed(): boolean {
     switch (this.currentStep()) {
       case 1:
-        return !!(this.data.fullName && this.data.dni && this.data.birthDate &&
-                  this.data.address && this.data.locality && this.data.province &&
-                  this.data.phone && this.data.email);
+        return !!(
+          this.data.fullName &&
+          this.validateDni(this.data.dni) &&
+          this.data.birthDate &&
+          this.data.age !== null && this.data.age >= 16 &&
+          this.data.address &&
+          this.data.locality &&
+          this.data.province &&
+          this.data.phone &&
+          this.validateEmail(this.data.email)
+        );
       case 2:
         return !!(this.data.category && this.data.subcategory);
       case 3:
@@ -2064,6 +2900,8 @@ export class InscripcionPageComponent implements OnDestroy {
       case 5:
         return true;
       case 6:
+        return true;
+      case 7:
         return this.data.acceptRegulations && this.data.acceptImageRights && this.data.acceptDataTruth;
       default:
         return false;
@@ -2071,12 +2909,14 @@ export class InscripcionPageComponent implements OnDestroy {
   }
 
   nextStep(): void {
-    if (this.canProceed() && this.currentStep() < 6) {
+    if (this.canProceed() && this.currentStep() < 7) {
       let next = this.currentStep() + 1;
       if (next === 3 && !this.isGroupType()) {
         next = 4;
       }
+      this.lastDirection.set('left');
       this.currentStep.set(next);
+      this.saveDraft();
     }
   }
 
@@ -2086,6 +2926,7 @@ export class InscripcionPageComponent implements OnDestroy {
       if (prev === 3 && !this.isGroupType()) {
         prev = 2;
       }
+      this.lastDirection.set('right');
       this.currentStep.set(prev);
     }
   }
@@ -2137,6 +2978,7 @@ export class InscripcionPageComponent implements OnDestroy {
       province: this.data.province || null,
       bio: this.data.biography || null,
       technical_needs: this.data.technicalNeeds || null,
+      rider_tecnico: this.hasRiderData() ? this.data.riderTecnico : null,
       proposal_name: this.data.proposalName || null,
       choreographer_name: this.data.choreographerName || null,
       style: this.data.style || null,
@@ -2150,6 +2992,7 @@ export class InscripcionPageComponent implements OnDestroy {
     this.http.post<InscripcionResult>(`${environment.apiUrl}/inscriptions/`, payload).subscribe({
       next: (result) => {
         this.inscriptionResult.set(result);
+        this.clearDraft();
         this.uploadFiles(result.id);
       },
       error: (err) => {
@@ -2171,7 +3014,7 @@ export class InscripcionPageComponent implements OnDestroy {
     if (files.length === 0) {
       this.submitting.set(false);
       this.submitted.set(true);
-      this.currentStep.set(7);
+      this.currentStep.set(8);
       return;
     }
 
@@ -2191,7 +3034,7 @@ export class InscripcionPageComponent implements OnDestroy {
           if (uploaded === total) {
             this.submitting.set(false);
             this.submitted.set(true);
-            this.currentStep.set(7);
+            this.currentStep.set(8);
           }
         },
         error: () => {
@@ -2199,7 +3042,7 @@ export class InscripcionPageComponent implements OnDestroy {
           if (uploaded === total) {
             this.submitting.set(false);
             this.submitted.set(true);
-            this.currentStep.set(7);
+            this.currentStep.set(8);
           }
         },
       });
