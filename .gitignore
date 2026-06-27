@@ -85,7 +85,7 @@ frontend/.angular/
 frontend/tmp/
 
 # Root frontend files (frontend lives in frontend/ only)
-/angular.json
+# angular.json at root needed for @netlify/angular-runtime plugin
 /package.json
 /tsconfig.json
 /tsconfig.app.json
